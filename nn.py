@@ -3,6 +3,7 @@ import numpy as np
 
 
 
+
 def createnet(nin,nhdn_list,nout,initw=.1,initv=10,bias=True):
     if bias!=True: bias=0
     net=[np.empty(nin+bias)] #don't see a need for init vals for input
@@ -55,7 +56,17 @@ def neti(net,weights):#[::-1] reverses
             ni+=1
         li+=1
 
-def pf(x): return 1/(1+2.7182818284590451**(-x))
 
-def fwdp(net,weights):pass
+def pf(x): return 1/(1+2.7182818284590451**(-x))
+def no(netl,weights):
+    dp=np.dot(netl,weights)
+    return pf(dp)
+
+def fwdp(net,weights):
+    for ani, awi, pli in neti(net,weights):
+        net[ani[0]][ani[1]]=no(net[pli],weights[awi[0]][awi[1]])
+        
+def bwdp(net,weights):
+    bl= [(ani, awi, pli) for (ani, awi, pli) in neti(net,weights)]
+    
     
