@@ -17,4 +17,4 @@ for adf,nums in dfs.items():
 ##put data in numpy record array
 #ddt=[('c',str,1),('x',train['0'].shape[1])] #i dont want to type 64
 #train=(for )
-digits=np.sort(train.keys())
+digits=np.sort(train.keys()) #list of the digits
