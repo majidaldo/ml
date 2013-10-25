@@ -3,7 +3,7 @@ import numpy as np
 
 
 
-def createnet(nin,nhdn_list,nout,initw=.1,initv=10,bias=True):
+def createnet(nin,nhdn_list,nout,initv=10,bias=True):
 #    if bias!=True: b=0
 #    else: b=1
 #    n=np.empty(sum([nin+b]+[sum(nhdn_list)+b*len(nhdn_list)]+[nout+b])
@@ -17,7 +17,7 @@ def createnet(nin,nhdn_list,nout,initw=.1,initv=10,bias=True):
         net.append( a )
     net.append(np.empty(nout,dtype='f32')) #dont see a need for init vals for output
     if bias==True: 
-        for anl in net: anl[0]=1 #att. 1 for all node layers
+        for anl in net[:-1]: anl[0]=1 #att. 1 for all node layers xcpt last 1
     net=dict(zip(range(len(net)),net))
     
     #ll=[] #link list defining connectivity
@@ -31,32 +31,70 @@ def createnet(nin,nhdn_list,nout,initw=.1,initv=10,bias=True):
 #    ll=np.array(ll #record array. this allows sorting for fwd and bwd 
 #    ,dtype=[('la','uint'),('ia','uint'),('lb','uint'),('ib','uint'),])
              #layer a, index of a node in a
-    ws= np.empty(len(ll),dtype='f32')
-    ws.fill(initw)
-    return {'net':net}#, 'll':ll, 'ws':ws}
+    #ws= np.empty(len(ll),dtype='f32')
+    #ws.fill(initw)
+    return net#{'net':net, 'll':ll, 'ws':ws}
     
-#nn traversal: a node and what branches from it
-    #or a layer going into a node  ahead <--
+def createll(net):
+    """connectivity of net"""
+    for alli,nis in neti(net): #left layerindex, right node keys
+        for arni in nis: #right node index
+            for alni in xrange(len(net[alli])): #left node index in layer
+                yield (alli,alni) , arni #left index, right index
 
-def neti(net):#
-    li=0
-    for alayer in (net[:-1]):#connecting layers up to output layer 
-        for anodei in xrange(len(alayer)):
-            for afwdnodei in xrange(len(net[li+1])):
-                yield  (li,anodei,   li+1,afwdnodei)
-        li+=1
+def createllv(net,initv=.1):
+    """creates an assoc b/w links and a value..for weights or deltas"""
+    return np.array([(a[0],a[1],b[0],b[1],initv) for a,b in createll(net)]
+    ,dtype=[('la','uint'),('ia','uint'),('lb','uint'),('ib','uint')
+            ,('v','f32')])
+
+def vtonode(anodei,llv,rev=False):
+    """returns values assoc with nodes pointing to spec node index"""
+    if rev==False: la=['lb','ib']
+    else: la=['la','ia']
+    # llv[llv[llv[la[0]]==anodei[0]][la[1]]==anodei[1]] #comprende??
+    f1= llv[llv[la[0]]==anodei[0]] #filter1
+    return f1[f1[la[1]]==anodei[1]]
+    #return llv[llv[llv[llv['la']==anodei[0]-1]['lb']==anodei[0]]['ib']==anodei[1]]
+
+
+
+#def createtree
+#    from collections import defaultdict
+#    def tree(): return defaultdict(tree)
+#    for ai in 
+    
+#nn traversal: get keys for a layer going into a node
+    #and /that/ node's keys
+
+def neti(net,rev=False):#fwd and bwd
+    lk=sorted(net.keys(),reverse=rev); lki=0
+    for alk in lk[:-1]:
+        yield alk, ((lk[lki+1],ani) for ani in xrange(len(net[lki+1])))
+        #key of layer feeding into, node keys
+        lki+=1 
+#    li=0
+#    for alayer in (net[:-1]):#connecting layers up to output layer 
+#        for anodei in xrange(len(alayer)):
+#            for afwdnodei in xrange(len(net[li+1])):
+#                yield  (li,anodei,   li+1,afwdnodei)
+#        li+=1
 
 #def fwdp(net,ll,ws):
 #    ll.sort(order=['la','lb']) #fwd
 #    for ali in xrange(len())
 
-    
-    
-
 def pf(x): return 1/(1+2.7182818284590451**(-x))
 def no(netl,weights):
     dp=np.dot(netl,weights)
     return pf(dp)
+
+
+def fwdp(net,weights):
+    for ali,nis in neti(net): #layerindex, node keys pointed to
+        for an in nis: #anode in node keys
+            net[an[0]][an[1]]=no(net[ali]
+            ,weights['la']==an)
 
 
 #def createnet(nin,nhdn_list,nout,initw=.1,initv=10,bias=True):
