@@ -37,24 +37,31 @@ def createnet(nin,nhdn_list,nout,initv=10,bias=True):
     
 def createll(net):
     """connectivity of net"""
-    for alli,nis in neti(net): #left layerindex, right node keys
+    for alli,nis in neti(net,'fwd'): #left layerindex, right node keys
         for arni in nis: #right node index
             for alni in xrange(len(net[alli])): #left node index in layer
                 yield (alli,alni) , arni #left index, right index
 
 def createllv(net,initv=.1):
-    """creates an assoc b/w links and a value..for weights or deltas"""
+    """a data structure that creates an assoc b/w 
+    links and a value..for weights or deltas"""
     return np.array([(a[0],a[1],b[0],b[1],initv) for a,b in createll(net)]
     ,dtype=[('la','uint'),('ia','uint'),('lb','uint'),('ib','uint')
-            ,('v','f32')])
+            ,('v','f32')]) #layerA, indexA(in a layer),...,'v'alue
 
-def vtonode(anodei,llv,rev=False):
-    """returns values assoc with nodes pointing to spec node index"""
-    if rev==False: la=['lb','ib']
+def vintonode(anodei,llv,direction):
+    """returns indexes to values assoc with 
+    nodes pointing to specified node index"""
+    if direction=='fwd': la=['lb','ib']
     else: la=['la','ia']
     # llv[llv[llv[la[0]]==anodei[0]][la[1]]==anodei[1]] #comprende??
-    f1= llv[llv[la[0]]==anodei[0]] #filter1
-    return f1[f1[la[1]]==anodei[1]]
+    #T/F array that satisfies conditions
+    return np.where(np.multiply(llv[la[0]]==anodei[0] #multiply two 
+                    ,llv[la[1]]==anodei[1])) #conditions to get AND
+    #returns (array,) for some reason                   
+                    
+    #f1= llv[llv[la[0]]==anodei[0]] #filter1
+    #return f1[f1[la[1]]==anodei[1]]
     #return llv[llv[llv[llv['la']==anodei[0]-1]['lb']==anodei[0]]['ib']==anodei[1]]
 
 
@@ -67,11 +74,14 @@ def vtonode(anodei,llv,rev=False):
 #nn traversal: get keys for a layer going into a node
     #and /that/ node's keys
 
-def neti(net,rev=False):#fwd and bwd
-    lk=sorted(net.keys(),reverse=rev); lki=0
+def neti(net,direction):#fwd and bwd
+    """iteration mechanism through the network"""
+    if direction=='fwd': direction=False
+    else: direction=True
+    lk=sorted(net.keys(),reverse=direction); lki=0
     for alk in lk[:-1]:
-        yield alk, ((lk[lki+1],ani) for ani in xrange(len(net[lki+1])))
-        #key of layer feeding into, node keys
+        yield alk, ((lk[lki+1],ani) for ani in xrange(len(net[lk[lki+1]])))
+        #key of layer feeding into a node, node keys
         lki+=1 
 #    li=0
 #    for alayer in (net[:-1]):#connecting layers up to output layer 
@@ -84,18 +94,49 @@ def neti(net,rev=False):#fwd and bwd
 #    ll.sort(order=['la','lb']) #fwd
 #    for ali in xrange(len())
 
-def pf(x): return 1/(1+2.7182818284590451**(-x))
+#node functions
+def nf(x): return 1/(1+2.7182818284590451**(-x))
 def no(netl,weights):
+    """nueron output"""
     dp=np.dot(netl,weights)
-    return pf(dp)
+    return nf(dp)
 
 
 def fwdp(net,weights):
-    for ali,nis in neti(net): #layerindex, node keys pointed to
-        for an in nis: #anode in node keys
-            net[an[0]][an[1]]=no(net[ali]
-            ,weights['la']==an)
+    for ali,nis in neti(net,'fwd'): #layerindex, node keys pointed to
+        for an in nis: #a node in node keys
+            assert(len(net[ali])==len(weights[vintonode(an,weights,'fwd')]['v']))
+            net[an[0]][an[1]]=\
+            no(net[ali],weights[vintonode(an,weights,'fwd')]['v'])
 
+
+import copy
+def errp(net,weights,targetout):
+    d=copy.deepcopy(net); d.pop(0) #don't need the first (input) layer
+    t=targetout;w=weights
+    #for each net output o_k unit calc err term:
+    li=sorted(net.keys())[-1] #(last) output layer
+    #fi=sorted(net.keys())[0] #1st
+    ok=net[li]; 
+    d[li]=ok*(1-ok)*(t-ok); del ok;del t;#dk=d[li];dk=ok*(1-ok)*(t-ok) #NOOOO!
+    #calc errors for hidden
+    for ali,nis in neti(d,'bwd'):
+        #if ali==fi+1: break #dont want to update the input layer
+        for an in nis:
+            assert(len(d[ali])==len(w[vintonode(an,w,'bwd')]['v'])  )
+            d[an[0]][an[1]]=net[an[0]][an[1]]*(1-net[an[0]][an[1]])\
+            *np.dot(d[ali],w[vintonode(an,w,'bwd')]['v'])
+    return d
+
+
+def Dw(net,weights,errs,eta=.5):
+    w=weights; d=errs;
+#    for aw in w:
+#        aw['v']+=aw['v']+eta*d[aw['lb']][aw['ib']]*net[aw['la']][aw['ia']]
+    return np.array([
+            aw['v']+eta*d[aw['lb']][aw['ib']]*net[aw['la']][aw['ia']]
+            for aw in w],dtype=w.dtype)         
+    
 
 #def createnet(nin,nhdn_list,nout,initw=.1,initv=10,bias=True):
 #    if bias!=True: bias=0
