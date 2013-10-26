@@ -3,7 +3,7 @@ import numpy as np
 
 
 
-def createnet(nin,nhdn_list,nout,initv=10,bias=True):
+def createnet(nin,nhdn_list,nout,bias=True):
 #    if bias!=True: b=0
 #    else: b=1
 #    n=np.empty(sum([nin+b]+[sum(nhdn_list)+b*len(nhdn_list)]+[nout+b])
@@ -13,7 +13,7 @@ def createnet(nin,nhdn_list,nout,initv=10,bias=True):
     else: bias=1    
     net=[np.empty(nin+bias,dtype='f32')] #don't see a need for init vals for input
     for ahn in nhdn_list:
-        a=np.empty(ahn+bias,dtype='f32'); a.fill(initv)
+        a=np.empty(ahn+bias,dtype='f32');# a.fill(initv)
         net.append( a )
     net.append(np.empty(nout,dtype='f32')) #dont see a need for init vals for output
     if bias==True: 
@@ -49,6 +49,7 @@ def createllv(net,initv=.1):
     ,dtype=[('la','uint'),('ia','uint'),('lb','uint'),('ib','uint')
             ,('v','f32')]) #layerA, indexA(in a layer),...,'v'alue
 
+#todo cache this
 def vintonode(anodei,llv,direction):
     """returns indexes to values assoc with 
     nodes pointing to specified node index"""
@@ -129,15 +130,22 @@ def errp(net,weights,targetout):
     return d
 
 
-def Dw(net,weights,errs,eta=.5):
+def Dw(net,weights,errs,eta=.05):
     w=weights; d=errs;
+    w2=w.copy()
 #    for aw in w:
-#        aw['v']+=aw['v']+eta*d[aw['lb']][aw['ib']]*net[aw['la']][aw['ia']]
-    return np.array([
-            aw['v']+eta*d[aw['lb']][aw['ib']]*net[aw['la']][aw['ia']]
-            for aw in w],dtype=w.dtype)         
-    
+#        aw['v']+=eta*d[aw['lb']][aw['ib']]*net[aw['la']][aw['ia']]
+    w2v= np.array([
+            eta*d[aw['lb']][aw['ib']]*net[aw['la']][aw['ia']]
+            for aw in w],dtype=w.dtype['v'])         
+    w2['v']=w2v
+    return w2
 
+def shallstop(neww,oldw,crit=.1):
+    fc=np.abs(neww-oldw)/oldw
+    return np.all(fc<crit)
+
+def trainex:
 #def createnet(nin,nhdn_list,nout,initw=.1,initv=10,bias=True):
 #    if bias!=True: bias=0
 #    net=[np.empty(nin+bias)] #don't see a need for init vals for input
