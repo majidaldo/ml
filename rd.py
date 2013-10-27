@@ -9,10 +9,10 @@ for adf in dfs])
 
 test={}
 train={}
-for adf,nums in dfs.items():
-    if 'train' in adf: train.update({adf[-5]:nums})
-    else:               test.update({adf[-5]:nums})
-#not the data is accessed like  data[digit][anarray],[arrayindex]
+for adf,nums in dfs.items(): #trainX.txt Xi=5
+    if 'train' in adf: train[adf[-5]]=nums
+    else:               test[adf[-5]]=nums
+#note the data is accessed like  data[digit][avectorindex]
 
 ##put data in numpy record array
 #ddt=[('c',str,1),('x',train['0'].shape[1])] #i dont want to type 64

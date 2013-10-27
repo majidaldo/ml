@@ -1,7 +1,5 @@
-from rd import digits
+import rd
 import numpy as np
-
-
 
 def createnet(nin,nhdn_list,nout,bias=True):
 #    if bias!=True: b=0
@@ -44,8 +42,10 @@ def createll(net):
 
 def createllv(net,initv=.1):
     """a data structure that creates an assoc b/w 
-    links and a value..for weights or deltas"""
-    return np.array([(a[0],a[1],b[0],b[1],initv) for a,b in createll(net)]
+    links and a value..for weights """
+    return np.array([(   a[0],a[1],b[0],b[1]
+                         ,(initv--initv)*np.random.rand()+-initv  )
+                      for a,b in createll(net)]
     ,dtype=[('la','uint'),('ia','uint'),('lb','uint'),('ib','uint')
             ,('v','f32')]) #layerA, indexA(in a layer),...,'v'alue
 
@@ -103,7 +103,11 @@ def no(netl,weights):
     return nf(dp)
 
 
-def fwdp(net,weights):
+def fwdp(net,weights,example):
+    x=example;
+    assert(len(net[0])==len(x))
+    net[0]=np.array(x,dtype=net[0].dtype) #assign input to network
+    #go fwd thru net
     for ali,nis in neti(net,'fwd'): #layerindex, node keys pointed to
         for an in nis: #a node in node keys
             assert(len(net[ali])==len(weights[vintonode(an,weights,'fwd')]['v']))
@@ -112,13 +116,14 @@ def fwdp(net,weights):
 
 
 import copy
-def errp(net,weights,targetout):
+def errp(net,weights,targetout):#"backpropagation"
     d=copy.deepcopy(net); d.pop(0) #don't need the first (input) layer
     t=targetout;w=weights
     #for each net output o_k unit calc err term:
     li=sorted(net.keys())[-1] #(last) output layer
     #fi=sorted(net.keys())[0] #1st
-    ok=net[li]; 
+    ok=net[li];
+    assert(len(ok)==len(t))
     d[li]=ok*(1-ok)*(t-ok); del ok;del t;#dk=d[li];dk=ok*(1-ok)*(t-ok) #NOOOO!
     #calc errors for hidden
     for ali,nis in neti(d,'bwd'):
@@ -135,17 +140,40 @@ def Dw(net,weights,errs,eta=.05):
     w2=w.copy()
 #    for aw in w:
 #        aw['v']+=eta*d[aw['lb']][aw['ib']]*net[aw['la']][aw['ia']]
-    w2v= np.array([
-            eta*d[aw['lb']][aw['ib']]*net[aw['la']][aw['ia']]
-            for aw in w],dtype=w.dtype['v'])         
+    w2v= np.array([eta*d[aw['lb']][aw['ib']]*net[aw['la']][aw['ia']]
+                   for aw in w],dtype=w.dtype['v'])         
     w2['v']=w2v
     return w2
 
-def shallstop(neww,oldw,crit=.1):
+def shallstop(neww,oldw,crit=.1):#assuming same order!
     fc=np.abs(neww-oldw)/oldw
     return np.all(fc<crit)
 
-def trainex:
+def trainex(inputvec,targetout,net,weights,**kwargs):
+    x=inputvec;t=targetout;w=weights;
+    fwdp(net,w,x,**kwargs)
+    d=errp(net,w,t,**kwargs)
+    w2=Dw(net,w,d,**kwargs)
+    return w2
+
+def inittraindigits(nhdn_list,**kwargs):
+    nt=len(rd.digits)#=10 number of target nodes
+    ni=len(rd.train[rd.digits[0]][0])#=64 num of input nodes
+    net=createnet(ni,nhdn_list,nt,**kwargs)
+    weights=createllv(net)
+    d2t={} #digit2target
+    for ad in rd.digits:
+        tda=np.zeros(nt,dtype=net[0].dtype)
+        tda[np.where(rd.digits==ad)[0]]=1
+        d2t[ad]=tda
+    return {'net':net,'w':weights,'d2t':d2t}
+
+
+def trainexs(inputvecs,targets,net,weights,**kwargs):
+    #combine inputvec,targets into example=(x,t)??
+    
+
+    
 #def createnet(nin,nhdn_list,nout,initw=.1,initv=10,bias=True):
 #    if bias!=True: bias=0
 #    net=[np.empty(nin+bias)] #don't see a need for init vals for input
