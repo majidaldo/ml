@@ -35,8 +35,8 @@
 import rd
 import numpy as np
 
-#import numbapro
-from numba import autojit
+import numbapro
+from numbapro import autojit
 
 netdtype='f32'
 def createnet(nin,nhdn_list,nout,**kwargs):#,bias=True):
@@ -108,17 +108,9 @@ def vintonode(anodei,llv,direction):
     return vinto
     #returns (array,) for some reason                   
                     
-    #f1= llv[llv[la[0]]==anodei[0]] #filter1
-    #return f1[f1[la[1]]==anodei[1]]
-    #return llv[llv[llv[llv['la']==anodei[0]-1]['lb']==anodei[0]]['ib']==anodei[1]]
 
 
 
-#def createtree
-#    from collections import defaultdict
-#    def tree(): return defaultdict(tree)
-#    for ai in 
-    
 #nn traversal: get keys for a layer going into a node
     #and /that/ node's keys
 
@@ -131,16 +123,7 @@ def neti(net,direction):#fwd and bwd
         yield alk, ((lk[lki+1],ani) for ani in xrange(len(net[lk[lki+1]])))
         #key of layer feeding into a node, node keys
         lki+=1 
-#    li=0
-#    for alayer in (net[:-1]):#connecting layers up to output layer 
-#        for anodei in xrange(len(alayer)):
-#            for afwdnodei in xrange(len(net[li+1])):
-#                yield  (li,anodei,   li+1,afwdnodei)
-#        li+=1
 
-#def fwdp(net,ll,ws):
-#    ll.sort(order=['la','lb']) #fwd
-#    for ali in xrange(len())
 
 #node functions
 @autojit
@@ -157,42 +140,47 @@ def fwdp(net,weights,inputv):
     if type(x) is not np.ndarray: x=np.array(x,dtype=netdtype)
     if len(inputv)+1==len(net[0]): il=1 #there is a bias node
     else: il=0
-    assert(len(net[0][il:])==len(x))
+    #assert(len(net[0][il:])==len(x))
     net[0][il:]=np.array(x,dtype=net[0].dtype) #assign input to network
     #go fwd thru net
     for alinis in neti(net,'fwd'): #layerindex, node keys pointed to
         ali=alinis[0];nis=alinis[1]
-        fwdpass(nis,net,ali,weights)        
-        #for an in nis: #a node in node keys
+        #fwdpcalc(nis,net,ali,weights)        
+        for an in nis: #a node in node keys
             #assert(len(net[ali])==len(weights[vintonode(an,weights,'fwd')]['v']))
-#            net[an[0]][an[1]]=\
-#            no(net[ali],weights[vintonode(an,weights,'fwd')]['v'])
-    return net[max(net.keys())].copy() #careful
-#@autojit(nopython=False)
-def fwdpass(nis,net,ali,weights):
-    for an in nis:
-        net[an[0]][an[1]]=\
+            net[an[0]][an[1]]=\
             no(net[ali],weights[vintonode(an,weights,'fwd')]['v'])
+    return net[max(net.keys())].copy() #careful
+#def fwdpcalc(nis,net,ali,weights):
+#    for an in nis:
+#        net[an[0]][an[1]]=\
+#            no(net[ali],weights[vintonode(an,weights,'fwd')]['v'])
 
-import copy
+
+from copy import deepcopy
 def errp(net,weights,targetout):#"backpropagation"
-    d=copy.deepcopy(net); d.pop(0) #don't need the first (input) layer
+    d=deepcopy(net); d.pop(0) #don't need the first (input) layer
     t=targetout;w=weights
     #for each net output o_k unit calc err term:
     li=sorted(net.keys())[-1] #(last) output layer
     #fi=sorted(net.keys())[0] #1st
     ok=net[li];
-    assert(len(ok)==len(t))
+    #assert(len(ok)==len(t))
     d[li]=ok*(1-ok)*(t-ok); del ok; del t;#dk=d[li];dk=ok*(1-ok)*(t-ok) #NOOOO!
     #calc errors for hidden
-    for ali,nis in neti(d,'bwd'):
+    for alinis in neti(d,'bwd'):
+        ali=alinis[0];nis=alinis[1]
         #if ali==fi+1: break #dont want to update the input layer
         for an in nis:
-            assert(len(d[ali])==len(w[vintonode(an,w,'bwd')]['v'])  )
+            #assert(len(d[ali])==len(w[vintonode(an,w,'bwd')]['v'])  )
             #print net[an[0]][an[1]],np.dot(d[ali],w[vintonode(an,w,'bwd')]['v'])
             d[an[0]][an[1]]=net[an[0]][an[1]]*(1-net[an[0]][an[1]])\
             *np.dot(d[ali],w[vintonode(an,w,'bwd')]['v'])
+            #errpcalc(an,nis,w,net,d,ali)
     return d
+#def errpcalc(an,nis,w,net,d,ali):
+#    d[an[0]][an[1]]=net[an[0]][an[1]]*(1-net[an[0]][an[1]])\
+#    *np.dot(d[ali],w[vintonode(an,w,'bwd')]['v'])
 
 
 #import numexpr
@@ -205,7 +193,7 @@ def fDw(net,weights,errs):#,**kwargs):#eta=.05):
 #    dws=[eta*d[aw['lb']][aw['ib']]*net[aw['la']][aw['ia']]
 #                   for aw in w]
     dws=np.empty(len(w))
-    for ai2w in xrange(len(w)):#numbapro.prange(len(w)) doesn't work
+    for ai2w in xrange(len(w)):#numbapro.prange(len(w)):#doesn't work
         dws[ai2w]=eta*d[w[ai2w]['lb']][w[ai2w]['ib']]*net[w[ai2w]['la']][w[ai2w]['ia']]
     return dws
 #    dj=np.fromiter([d[aw['lb']][aw['ib']] for aw in w],netdtype
@@ -240,6 +228,7 @@ for ad in rd.digits:
     tda[np.where(rd.digits==ad)[0]]=1
     digit2target[ad]=tda #10 units
     #digit2target[ad]=np.array([int(ad)],dtype=netdtype) #1 unit
+del ad
 
 def inittraindigits(nhdn_list,**kwargs):
     nt=len(digit2target[rd.digits[0]])#=number of target nodes
@@ -249,18 +238,24 @@ def inittraindigits(nhdn_list,**kwargs):
     return {'net':net,'w':weights}#,'d2t':d2t}
 
 
-
+wl=[]
 def trainexs(net,weights,**kwargs):
-    #must go thru all examples once     
+    #must go thru all examples once
+    alpha=kwargs.setdefault('alpha',.5)     
     for example in genrandtrainingexs(**kwargs):
-        weights['v']+=trainex(example,net,weights,**kwargs)
+        Dw=trainex(example,net,weights)#,**kwargs)
+        weights['v']+=Dw
     #return weights
     #convergence loop
-    for i in xrange(5000):
+    for i in xrange(10):
         print 'convergence pass',1+i
         for example in genrandtrainingexs(**kwargs):
-            #weights2=weights.copy()
-            weights['v']+=trainex(example,net,weights,**kwargs)
+            #weight=weights.copy()
+            Dwp=Dw
+            Dw=trainex(example,net,weights)+Dwp*alpha
+            weights['v']+=Dw
+            wl.append(weights['v'].copy())
+            Dwp=Dw
 #            if True==shouldstop(weights2['v'],weights['v'],**kwargs):
 #                return weights2
 #            #print 'weight diff abs sum=',sum(np.abs(weights2['v']-weights['v']))
@@ -274,7 +269,7 @@ def trainexs(net,weights,**kwargs):
 def gentrainingexs(**kwargs):#ts=rd.train):
     ts=kwargs.setdefault('ts',rd.train) #training set
     for avec,adigit in rd.getdata(ts):
-        yield avec, digit2target[ad]    
+        yield avec, digit2target[adigit]    
 
 def genrandtrainingexs(**kwargs):
     tex=list(gentrainingexs(**kwargs))
@@ -285,64 +280,6 @@ def genrandtrainingexs(**kwargs):
 
 
 
-#def createnet(nin,nhdn_list,nout,initw=.1,initv=10,bias=True):
-#    if bias!=True: bias=0
-#    net=[np.empty(nin+bias)] #don't see a need for init vals for input
-#    for ahn in nhdn_list:
-#        a=np.empty(ahn+bias); a.fill(initv)
-#        net.append( a )
-#    net.append(np.empty(nout)) #dont see a need for init vals for output
-#    w=[];
-#    i=0;
-#    for al in [ahln for ahln in nhdn_list]+[nout]:#ahl in nhdn_list:
-#        a=np.empty( [al,len(net[i])] )#+1 for the bias
-#        i+=1
-#        a.fill(initw)
-#        w.append(a) 
-#    w=np.array(w);
-#    net=np.array(net)
-#    if bias==True: 
-#        for anl in net: anl[0]=1 #att. 1 for all node layers
-#    return {'n': (net) 
-#    ,'w': (w )} #weights correspond to  the middle layers
-#    #this return will be my data structuure
-#
-#def wi2n(nodei,net,weights):
-#    """est relation b/w inner nodes and their weights.
-#    node index"""
-#    return net[1+nodei[0]][nodei[1]]
 
-#def neti(net,weights):#[::-1] reverses
-##    li=0; #nl=len(weights); 
-##    for alayer in weights:
-##        ni=0;
-##        for anodeweights in alayer:
-##            try: yield net[1+li][ni+1],anodeweights,net[li] #values
-##                 # node, its weights , preceding layer i       
-##            #, wi2n((li,ni),net,weights)
-##            except IndexError: raise StopIteration
-##            ni+=1
-##        li+=1
-#    li=0; nwl=len(weights)#;nnl=len(net) 
-#    for alayeri in xrange(nwl):
-#        ni=0;
-#        for anodeweightsi in xrange(len(weights[alayeri])):
-#            if (len(net[1+li])-ni)<2:break#print ni,li,len(weights[alayeri])
-#            try:
-#                #yield net[1+li][ni+1],weights[alayeri][anodeweightsi],net[li]#values
-#                yield (1+li,ni+1),(alayeri,anodeweightsi),li                  
-#                 # node, its weights , preceding layer i       
-#            #, wi2n((li,ni),net,weights)
-#            except IndexError: raise StopIteration #shouldn't come here
-#            ni+=1
-#        li+=1
-
-
-#def fwdp(net,weights):
-#    for ani, awi, pli in neti(net,weights):
-#        net[ani[0]][ani[1]]=no(net[pli],weights[awi[0]][awi[1]])
-#        
-#def bwdp(net,weights):
-#    bl= [(ani, awi, pli) for (ani, awi, pli) in neti(net,weights)]
 #    
 #    
