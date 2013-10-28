@@ -18,3 +18,10 @@ for adf,nums in dfs.items(): #trainX.txt Xi=5
 #ddt=[('c',str,1),('x',train['0'].shape[1])] #i dont want to type 64
 #train=(for )
 digits=np.sort(train.keys()) #list of the digits
+
+def getdata(dataset):
+    ds=dataset #test or train
+    for ad in ds:#adigit in ds
+        for avec in ds[ad]:
+            yield avec, ad
+    

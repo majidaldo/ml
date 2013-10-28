@@ -1,7 +1,47 @@
+
+
+#code correctness verified with sample calcs
+#frm http://ccg.doc.gold.ac.uk
+#/teaching/artificial_intelligence/lecture13.html
+#
+#
+#tn=createnet(3,[2],2,bias=False)
+#tw=createllv(tn)
+#tw['v']=[.2,-.1,.4,.7,-1.2,1.2,1.1,.1,3.1,1.17]
+#/ forward propagation
+#fwdp(tn,tw,[10,30,20])
+#Out[9]: array([ 0.75019771,  0.95709878], dtype=float32)
+#/ error calculation
+#errp(tn,tw,[1,0])
+#Out[23]: 
+#{1: array([ -6.40188227e-05,  -2.74555990e-04], dtype=float32),
+# 2: array([ 0.04681322, -0.03929915])}
+#te=Out[23]
+#dw['v']=tw.copy()['v']=fDw(tn,tw,te,eta=.1)
+#dw
+#Out[36]: 
+#array([(0L, 0L, 1L, 0L, -6.401882274076343e-05),
+#       (0L, 1L, 1L, 0L, -0.00019205646822229028),
+#       (0L, 2L, 1L, 0L, -0.00012803764548152685),
+#       (0L, 0L, 1L, 1L, -0.00027455599047243595),
+#       (0L, 1L, 1L, 1L, -0.0008236679714173079),
+#       (0L, 2L, 1L, 1L, -0.0005491119809448719),
+#       (1L, 0L, 2L, 0L, 0.0046770572662353516),
+#       (1L, 1L, 2L, 0L, 3.1331393984146416e-05),
+#       (1L, 0L, 2L, 1L, -0.003926334902644157),
+#       (1L, 1L, 2L, 1L, -2.6302335754735395e-05)], 
+#      dtype=[('la', '<u4'), ('ia', '<u4'), ('lb', '<u4'), ('ib', '<u4'), ('v', '<f4')])
+
 import rd
 import numpy as np
 
-def createnet(nin,nhdn_list,nout,bias=True):
+#import numbapro
+from numba import autojit
+
+netdtype='f32'
+def createnet(nin,nhdn_list,nout,**kwargs):#,bias=True):
+    """the parameters exclude the bias 'node'"""
+    bias=kwargs.setdefault('bias',True)
 #    if bias!=True: b=0
 #    else: b=1
 #    n=np.empty(sum([nin+b]+[sum(nhdn_list)+b*len(nhdn_list)]+[nout+b])
@@ -9,11 +49,11 @@ def createnet(nin,nhdn_list,nout,bias=True):
 #    n.fill(initv)
     if bias!=True: bias=0
     else: bias=1    
-    net=[np.empty(nin+bias,dtype='f32')] #don't see a need for init vals for input
+    net=[np.empty(nin+bias,dtype=netdtype)] #don't see a need for init vals for input
     for ahn in nhdn_list:
-        a=np.empty(ahn+bias,dtype='f32');# a.fill(initv)
+        a=np.empty(ahn+bias,dtype=netdtype);# a.fill(initv)
         net.append( a )
-    net.append(np.empty(nout,dtype='f32')) #dont see a need for init vals for output
+    net.append(np.empty(nout,dtype=netdtype)) #dont see a need for init vals for output
     if bias==True: 
         for anl in net[:-1]: anl[0]=1 #att. 1 for all node layers xcpt last 1
     net=dict(zip(range(len(net)),net))
@@ -40,25 +80,32 @@ def createll(net):
             for alni in xrange(len(net[alli])): #left node index in layer
                 yield (alli,alni) , arni #left index, right index
 
-def createllv(net,initv=.1):
+def createllv(net,**kwargs):#,initv=.1):
     """a data structure that creates an assoc b/w 
     links and a value..for weights """
+    initv=kwargs.setdefault('initv',.1)
     return np.array([(   a[0],a[1],b[0],b[1]
-                         ,(initv--initv)*np.random.rand()+-initv  )
+                         ,(initv--initv)*np.random.rand()+-initv  )#rnd[+a,-a]
                       for a,b in createll(net)]
     ,dtype=[('la','uint'),('ia','uint'),('lb','uint'),('ib','uint')
-            ,('v','f32')]) #layerA, indexA(in a layer),...,'v'alue
+            ,('v','f32')]) #layerA, indexA for a node (in a layer),...,'v'alue
 
-#todo cache this
+
+vintonode_cache={}
 def vintonode(anodei,llv,direction):
     """returns indexes to values assoc with 
     nodes pointing to specified node index"""
+    #(anodei),hash(str(llv)),(direction)
+    if ((anodei),(direction)) in vintonode_cache:
+        return vintonode_cache[(anodei,direction)]
     if direction=='fwd': la=['lb','ib']
     else: la=['la','ia']
     # llv[llv[llv[la[0]]==anodei[0]][la[1]]==anodei[1]] #comprende??
     #T/F array that satisfies conditions
-    return np.where(np.multiply(llv[la[0]]==anodei[0] #multiply two 
+    vinto= np.where(np.multiply(llv[la[0]]==anodei[0] #multiply two 
                     ,llv[la[1]]==anodei[1])) #conditions to get AND
+    vintonode_cache[(anodei,direction)]=vinto
+    return vinto
     #returns (array,) for some reason                   
                     
     #f1= llv[llv[la[0]]==anodei[0]] #filter1
@@ -96,24 +143,36 @@ def neti(net,direction):#fwd and bwd
 #    for ali in xrange(len())
 
 #node functions
+@autojit
 def nf(x): return 1/(1+2.7182818284590451**(-x))
+@autojit
 def no(netl,weights):
     """nueron output"""
     dp=np.dot(netl,weights)
     return nf(dp)
 
 
-def fwdp(net,weights,example):
-    x=example;
-    assert(len(net[0])==len(x))
-    net[0]=np.array(x,dtype=net[0].dtype) #assign input to network
+def fwdp(net,weights,inputv):
+    x=inputv
+    if type(x) is not np.ndarray: x=np.array(x,dtype=netdtype)
+    if len(inputv)+1==len(net[0]): il=1 #there is a bias node
+    else: il=0
+    assert(len(net[0][il:])==len(x))
+    net[0][il:]=np.array(x,dtype=net[0].dtype) #assign input to network
     #go fwd thru net
-    for ali,nis in neti(net,'fwd'): #layerindex, node keys pointed to
-        for an in nis: #a node in node keys
-            assert(len(net[ali])==len(weights[vintonode(an,weights,'fwd')]['v']))
-            net[an[0]][an[1]]=\
+    for alinis in neti(net,'fwd'): #layerindex, node keys pointed to
+        ali=alinis[0];nis=alinis[1]
+        fwdpass(nis,net,ali,weights)        
+        #for an in nis: #a node in node keys
+            #assert(len(net[ali])==len(weights[vintonode(an,weights,'fwd')]['v']))
+#            net[an[0]][an[1]]=\
+#            no(net[ali],weights[vintonode(an,weights,'fwd')]['v'])
+    return net[max(net.keys())].copy() #careful
+#@autojit(nopython=False)
+def fwdpass(nis,net,ali,weights):
+    for an in nis:
+        net[an[0]][an[1]]=\
             no(net[ali],weights[vintonode(an,weights,'fwd')]['v'])
-
 
 import copy
 def errp(net,weights,targetout):#"backpropagation"
@@ -124,56 +183,108 @@ def errp(net,weights,targetout):#"backpropagation"
     #fi=sorted(net.keys())[0] #1st
     ok=net[li];
     assert(len(ok)==len(t))
-    d[li]=ok*(1-ok)*(t-ok); del ok;del t;#dk=d[li];dk=ok*(1-ok)*(t-ok) #NOOOO!
+    d[li]=ok*(1-ok)*(t-ok); del ok; del t;#dk=d[li];dk=ok*(1-ok)*(t-ok) #NOOOO!
     #calc errors for hidden
     for ali,nis in neti(d,'bwd'):
         #if ali==fi+1: break #dont want to update the input layer
         for an in nis:
             assert(len(d[ali])==len(w[vintonode(an,w,'bwd')]['v'])  )
+            #print net[an[0]][an[1]],np.dot(d[ali],w[vintonode(an,w,'bwd')]['v'])
             d[an[0]][an[1]]=net[an[0]][an[1]]*(1-net[an[0]][an[1]])\
             *np.dot(d[ali],w[vintonode(an,w,'bwd')]['v'])
     return d
 
 
-def Dw(net,weights,errs,eta=.05):
+#import numexpr
+@autojit
+def fDw(net,weights,errs):#,**kwargs):#eta=.05):
+    eta=.1#kwargs.setdefault('eta',.1)
     w=weights; d=errs;
-    w2=w.copy()
 #    for aw in w:
-#        aw['v']+=eta*d[aw['lb']][aw['ib']]*net[aw['la']][aw['ia']]
-    w2v= np.array([eta*d[aw['lb']][aw['ib']]*net[aw['la']][aw['ia']]
-                   for aw in w],dtype=w.dtype['v'])         
-    w2['v']=w2v
-    return w2
+#        print eta,d[aw['lb']][aw['ib']],net[aw['la']][aw['ia']]
+#    dws=[eta*d[aw['lb']][aw['ib']]*net[aw['la']][aw['ia']]
+#                   for aw in w]
+    dws=np.empty(len(w))
+    for ai2w in xrange(len(w)):#numbapro.prange(len(w)) doesn't work
+        dws[ai2w]=eta*d[w[ai2w]['lb']][w[ai2w]['ib']]*net[w[ai2w]['la']][w[ai2w]['ia']]
+    return dws
+#    dj=np.fromiter([d[aw['lb']][aw['ib']] for aw in w],netdtype
+#    ,count=len(w))
+#    #,dtype=netdtype)
+#    xji=np.fromiter([net[aw['la']][aw['ia']] for aw in w],netdtype
+#    ,count=len(w))
+    #,dtype=netdtype)
+#    return eta#*dj*xji
+    #numexpr to the rescue!
+    #return numexpr.evaluate('eta')#eta*dj*xji')
 
-def shallstop(neww,oldw,crit=.1):#assuming same order!
+def shouldstop(neww,oldw,**kwargs):#crit=.001):#assuming same order!
+    crit=kwargs.setdefault('crit',.001)    
     fc=np.abs(neww-oldw)/oldw
     return np.all(fc<crit)
 
-def trainex(inputvec,targetout,net,weights,**kwargs):
-    x=inputvec;t=targetout;w=weights;
-    fwdp(net,w,x,**kwargs)
-    d=errp(net,w,t,**kwargs)
-    w2=Dw(net,w,d,**kwargs)
-    return w2
+@autojit
+def trainex(inputvec_targetout,net,weights):#,**kwargs):
+    x=inputvec_targetout[0];
+    t=inputvec_targetout[1];
+    w=weights;
+    fwdp(  net,w,x)#,**kwargs)
+    d=errp(net,w,t)#,**kwargs)
+    Dw=fDw(net,w,d)#,**kwargs)
+    return Dw
+
+
+digit2target={} #digit2target
+for ad in rd.digits:
+    tda=np.zeros(len(rd.digits),dtype=netdtype)
+    tda[np.where(rd.digits==ad)[0]]=1
+    digit2target[ad]=tda #10 units
+    #digit2target[ad]=np.array([int(ad)],dtype=netdtype) #1 unit
 
 def inittraindigits(nhdn_list,**kwargs):
-    nt=len(rd.digits)#=10 number of target nodes
+    nt=len(digit2target[rd.digits[0]])#=number of target nodes
     ni=len(rd.train[rd.digits[0]][0])#=64 num of input nodes
     net=createnet(ni,nhdn_list,nt,**kwargs)
-    weights=createllv(net)
-    d2t={} #digit2target
-    for ad in rd.digits:
-        tda=np.zeros(nt,dtype=net[0].dtype)
-        tda[np.where(rd.digits==ad)[0]]=1
-        d2t[ad]=tda
-    return {'net':net,'w':weights,'d2t':d2t}
+    weights=createllv(net,**kwargs)
+    return {'net':net,'w':weights}#,'d2t':d2t}
 
 
-def trainexs(inputvecs,targets,net,weights,**kwargs):
-    #combine inputvec,targets into example=(x,t)??
+
+def trainexs(net,weights,**kwargs):
+    #must go thru all examples once     
+    for example in genrandtrainingexs(**kwargs):
+        weights['v']+=trainex(example,net,weights,**kwargs)
+    #return weights
+    #convergence loop
+    for i in xrange(5000):
+        print 'convergence pass',1+i
+        for example in genrandtrainingexs(**kwargs):
+            #weights2=weights.copy()
+            weights['v']+=trainex(example,net,weights,**kwargs)
+#            if True==shouldstop(weights2['v'],weights['v'],**kwargs):
+#                return weights2
+#            #print 'weight diff abs sum=',sum(np.abs(weights2['v']-weights['v']))
+#            weights=weights2
+    #print "didn't converge"
+    return weights
+
+
+
+
+def gentrainingexs(**kwargs):#ts=rd.train):
+    ts=kwargs.setdefault('ts',rd.train) #training set
+    for avec,adigit in rd.getdata(ts):
+        yield avec, digit2target[ad]    
+
+def genrandtrainingexs(**kwargs):
+    tex=list(gentrainingexs(**kwargs))
+    i2tex=np.arange(len(tex),dtype='uint32')
+    np.random.shuffle(i2tex)
+    for i in i2tex: yield tex[i]
     
 
-    
+
+
 #def createnet(nin,nhdn_list,nout,initw=.1,initv=10,bias=True):
 #    if bias!=True: bias=0
 #    net=[np.empty(nin+bias)] #don't see a need for init vals for input
