@@ -185,8 +185,8 @@ def errp(net,weights,targetout):#"backpropagation"
 
 #import numexpr
 @autojit
-def fDw(net,weights,errs):#,**kwargs):#eta=.05):
-    eta=.1#kwargs.setdefault('eta',.1)
+def fDw(net,weights,errs,eta):#,**kwargs):#eta=.05):
+    #eta=.1#kwargs.setdefault('eta',.1)
     w=weights; d=errs;
 #    for aw in w:
 #        print eta,d[aw['lb']][aw['ib']],net[aw['la']][aw['ia']]
@@ -206,29 +206,35 @@ def fDw(net,weights,errs):#,**kwargs):#eta=.05):
     #numexpr to the rescue!
     #return numexpr.evaluate('eta')#eta*dj*xji')
 
-def shouldstop(neww,oldw,**kwargs):#crit=.001):#assuming same order!
-    crit=kwargs.setdefault('crit',.001)    
-    fc=np.abs(neww-oldw)/oldw
-    return np.all(fc<crit)
 
 @autojit
-def trainex(inputvec_targetout,net,weights):#,**kwargs):
+def trainex(inputvec_targetout,net,weights,eta):#,**kwargs):
     x=inputvec_targetout[0];
     t=inputvec_targetout[1];
     w=weights;
     fwdp(  net,w,x)#,**kwargs)
     d=errp(net,w,t)#,**kwargs)
-    Dw=fDw(net,w,d)#,**kwargs)
+    Dw=fDw(net,w,d,eta)#,**kwargs)
     return Dw
 
 
-digit2target={} #digit2target
+#functions and data structures related to classification
+#----
+digit2target={}
+i2digit={} # ['0','1','2',..] indexed as 0,1,2...
+hashstrtarget2digit={}
 for ad in rd.digits:
-    tda=np.zeros(len(rd.digits),dtype=netdtype)
-    tda[np.where(rd.digits==ad)[0]]=1
-    digit2target[ad]=tda #10 units
-    #digit2target[ad]=np.array([int(ad)],dtype=netdtype) #1 unit
+    #np.array([int(ad)],dtype=netdtype) #1 unit
+    tda=np.zeros(len(rd.digits),dtype=netdtype) #10 units
+    i2digit[np.where(rd.digits==ad)[0][0]]=ad
+    tda[np.where(rd.digits==ad)[0][0]]=1
+    digit2target[ad]=tda
+    hashstrtarget2digit[hash(str(tda))]=ad
 del ad
+def classof(vector): return i2digit[np.argmax(vector)]
+#----
+
+
 
 def inittraindigits(nhdn_list,**kwargs):
     nt=len(digit2target[rd.digits[0]])#=number of target nodes
@@ -238,44 +244,84 @@ def inittraindigits(nhdn_list,**kwargs):
     return {'net':net,'w':weights}#,'d2t':d2t}
 
 
-wl=[]
+
+from collections import deque
 def trainexs(net,weights,**kwargs):
     #must go thru all examples once
-    alpha=kwargs.setdefault('alpha',.5)     
-    for example in genrandtrainingexs(**kwargs):
-        Dw=trainex(example,net,weights)#,**kwargs)
+    maxcloops=kwargs.setdefault('maxcloops',100)
+    alpha=kwargs.setdefault('alpha',.5)
+    eta=kwargs.setdefault('lrate',.1)
+    ccrit=kwargs.setdefault('ccrit',.01)
+    validpct=float(kwargs.setdefault('validpct',20))
+    trainds=kwargs.setdefault('trainds',rd.train)
+    trainds=list(genrandexs(trainds))
+    vn=int((validpct*.01)*len(trainds))
+    tn=len(trainds)-vn
+    ts=trainds[:tn]; #training set
+    vs=trainds[tn:]  #validation set
+    #must go thru all data at least once
+    for example in ts:
+        Dw=trainex(example,net,weights,eta)#,**kwargs)
         weights['v']+=Dw
     #return weights
     #convergence loop
-    for i in xrange(10):
-        print 'convergence pass',1+i
-        for example in genrandtrainingexs(**kwargs):
-            #weight=weights.copy()
-            Dwp=Dw
-            Dw=trainex(example,net,weights)+Dwp*alpha
+    wl=[]
+    vfc,tfc=0,0
+    tchanges=deque(maxlen=5)
+    vchanges=deque(maxlen=5)    
+    print 'epoch | % correct: \tvalidation \ttrain'
+    for i in xrange(maxcloops):
+        for example in ts:
+            Dwp=Dw #previous Dw
+            Dw=trainex(example,net,weights,eta)+Dwp*alpha
             weights['v']+=Dw
             wl.append(weights['v'].copy())
             Dwp=Dw
-#            if True==shouldstop(weights2['v'],weights['v'],**kwargs):
-#                return weights2
-#            #print 'weight diff abs sum=',sum(np.abs(weights2['v']-weights['v']))
-#            weights=weights2
-    #print "didn't converge"
-    return weights
+        oldtfc=tfc
+        oldvfc=vfc
+        vfc=validate(net,weights,vs)
+        tfc=validate(net,weights,ts)
+        print i+1\
+             ,'\t\t\t%(pc)g' % {'pc':vfc*100}\
+             ,'\t\t%(pc)g' % {'pc':tfc*100}
+        tchange=(tfc-oldtfc)/oldtfc
+        vchange=(vfc-oldvfc)/oldvfc
+        tchanges.append(tchange)
+        vchanges.append(vchange)
+        #stop if training accuracy goes up
+        #while validation accuracy goes down
+        if     np.average(vchanges)<ccrit\
+        and    np.average(tchanges)>ccrit:
+            break
+            
+    if i==maxcloops-1: print "didn't converge"
+    return {'w':weights,'whist':np.array(wl)}
+
+
+
+def validate(net,weights,examples):
+    evals=np.array([
+    classof(fwdp(net,weights,ex[0]))
+                        ==hashstrtarget2digit[hash(str(ex[1]))]
+    for ex in examples],dtype=bool)
+    return np.sum(evals)/float(len(evals))
+    
 
 
 
 
-def gentrainingexs(**kwargs):#ts=rd.train):
-    ts=kwargs.setdefault('ts',rd.train) #training set
-    for avec,adigit in rd.getdata(ts):
-        yield avec, digit2target[adigit]    
+def genexs(ds,**kwargs):
+    for avec,adigit in rd.getdata(ds):
+        yield avec, digit2target[adigit]
 
-def genrandtrainingexs(**kwargs):
-    tex=list(gentrainingexs(**kwargs))
-    i2tex=np.arange(len(tex),dtype='uint32')
-    np.random.shuffle(i2tex)
-    for i in i2tex: yield tex[i]
+
+def genrandexs(ds,**kwargs):
+    n=kwargs.setdefault('n','all')
+    exs=list(genexs(ds,**kwargs))
+    if n=='all': n=None
+    i2exs=np.arange(len(exs),dtype='uint32')
+    np.random.shuffle(i2exs)
+    for i in i2exs[:n]: yield exs[i]
     
 
 
