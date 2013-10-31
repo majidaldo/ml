@@ -248,7 +248,7 @@ def trainex(inputvec_targetout,net,weights,eta):#,**kwargs):
     Dw=fDw(net,w,d,eta)#,**kwargs)
     return Dw
 
-from collections import deque
+
 def trainexs(net,weights,**kwargs):
     """main training routine:operates in-place on the given weights.
     a part of the training set is set for validation. the convergence is 
@@ -256,7 +256,7 @@ def trainexs(net,weights,**kwargs):
     """
     global vintonode_cache;vintonode_cache={} #global...ewww
     maxcloops=kwargs.setdefault('maxcloops',100) #max epoch loops
-    mincloops=kwargs.setdefault('mincloops',10) #min epoch loops
+    mincloops=kwargs.setdefault('mincloops',20) #min epoch loops
     alpha=kwargs.setdefault('alpha',.5) #momentum
     eta=kwargs.setdefault('lrate',.1)   #learning rate
     ccritpct=float(kwargs.setdefault('ccritpct',5))#asympotic stopping criteria
@@ -271,11 +271,10 @@ def trainexs(net,weights,**kwargs):
     #initializations
     wl=[] #container for history of weights
     Dw=np.zeros_like(weights['v']) #space for Delta weights
-    vfc=validate(net,weights,vs) 
-    tfc=validate(net,weights,ts)
+    vl=[] #container for correct classification rate
+    tl=[]
     maxv=0.0001
-    tchanges=deque(maxlen=mincloops) #keeping last mincloops of test...
-    vchanges=deque(maxlen=mincloops) #...and validation fraction correct
+
     print 'epoch | % correct: \tvalidation \ttrain'
     for i in xrange(maxcloops):
         for example in ts:
@@ -284,35 +283,28 @@ def trainexs(net,weights,**kwargs):
             weights['v']+=Dw
             wl.append(weights['v'].copy())
             Dwp=Dw
-        oldtfc=tfc
-        oldvfc=vfc
         vfc=validate(net,weights,vs);
         tfc=validate(net,weights,ts)
+        vl.append(vfc)
+        tl.append(tfc)
         maxv=max(maxv,vfc)
         print i+1\
              ,'\t\t\t%(pc)g' % {'pc':vfc*100}\
                ,'\t\t%(pc)g' % {'pc':tfc*100}
-        tchange=(tfc-oldtfc)/oldtfc
-        vchange=(vfc-oldvfc)/oldvfc
-        tchanges.append(tchange)        
-        vchanges.append(vchange);
-#        print '\t\t\t',np.average(vchanges)\
-#             ,'\t\t',np.average(tchanges)
-        #the expected trend is asymptotic. stop when training going up
-        #if np.average(vchanges)<-ccrit\
+        #stop when it goes below ccritpct of maximum achieved correct
+        #classification rate
         if (vfc-maxv)/maxv<-ccritpct*.01\
                     and i>=mincloops-1:
-    #and  np.average(tchanges)> ccrit\#(/*while validation going down)*/
                    break
     if i==maxcloops-1: print "didn't converge in allowed time"
     
-    errs=1-vfc;
+    errs=1-tfc;
     n=len(trainds)
     pm=1.96*(errs*(1-errs)/n)**.5
     return {'w':weights
-            ,'vfc':vfc,'tfc':tfc 
+            ,'vfc':np.array(vl),'tfc':np.array(tl) 
             ,'whist':np.array(wl)
-            ,'95conf':(errs-pm,errs+pm)
+            ,'95errconf':(errs-pm,errs+pm)
            }
 
 def committee(net,weights,**kwargs):
