@@ -14,9 +14,7 @@ for adf,nums in dfs.items(): #trainX.txt Xi=5
 #note the data is accessed like  data[digit][avectorindex]
 del adf;del nums;
 
-##put data in numpy record array
-#ddt=[('c',str,1),('x',train['0'].shape[1])] #i dont want to type 64
-#train=(for )
+
 digits=np.sort(train.keys()) #list of the digits
 
 def getdata(dataset):
@@ -24,4 +22,11 @@ def getdata(dataset):
     for ad in ds:#adigit in ds
         for avec in ds[ad]:
             yield avec, ad
+
+
+
+
+#just a personal note
+#maybe input data in numpy record array
+#ddt=[('c',str,1),('x',train['0'].shape[1])] #i dont want to type 64
     
