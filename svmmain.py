@@ -23,7 +23,8 @@ def testprob():
     
 
 
-#psqp=pyOpt.pyPSQP.PSQP()
-#psqp.options['MIT']=[int,1]
-slsqp=pyOpt.pySLSQP.SLSQP()
+#fsqp=pyOpt.pyFSQP.FSQP() #did not compile!
+psqp=pyOpt.pyPSQP.PSQP()
+algencan=pyOpt.pyALGENCAN.ALGENCAN()
+slsqp=pyOpt.pySLSQP.SLSQP() 
 #optr=opt(optprob)

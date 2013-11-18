@@ -45,8 +45,7 @@ def listijs(n): return np.array(#indexing
 #lijs=
 yxs= listyxs(rd.train,'5','2')
 lijs=listijs(  len(yxs)  ) #indexing
-#lis=lijs.T[0].copy()
-#ljs=lijs.T[1].copy()
+
 
 @autojit
 def yKcalc(xs,ys,kernel):
@@ -87,53 +86,26 @@ def of(alphas):
     for i in xrange(ninej,n-1):
         sayKs+=yKs[i]*alphas[lijs[i][0]]*alphas[lijs[i][1]]#argh! wrote it 2x
     return sa-.5*sayKs
-    #tia=tia.T[0].copy()
-#    for ij in li[:5]: print ij
-#    yks=ykc.setdefault(hash(  (str(ys),kernel)  )
-#           , np.array([ys[ij[0]]*ys[ij[1]]*kernel(xs[ij[0]],xs[ij[1]])\
-#                       for ij in ijs],dtype=mf)
-#         )
-
-    
-    
-#    #@jit(restype=numba.float_,argtypes=[typeof(ijs),typeof(ijs)])    
-#    def ayk(i,j): return alphas[i]*alphas[j]*yks[(i,j)]#*ys[i]*ys[j]*kernel(xs[i],xs[j])    
-#    
-#    yks=ykc.setdefault(hash(  (str(ys),kernel)  )
-#           ,np.array(list(comboswr(xrange(len(alphas)),2)))
-#           # ,dict([  [ij, ys[ij[0]]*ys[ij[1]]*kernel(xs[ij[0]],xs[ij[1]])] \
-#           #  for ij in np.array(list(comboswr(xrange(len(alphas)),2)) )     ])
-#         )
-#    sayk=0
-#    
-#    return yks
-#    @jit(float_(int_,int_))
-#    def ayk(i,j): return alphas[i]*alphas[j]*yks[(i,j)]#*ys[i]*ys[j]*kernel(xs[i],xs[j])    
-#    for ij in ijs: sayk+=ayk(ij[0],ij[1])
-#    sayk*=2
-#    for i in xrange(len(alphas)): sayk+=ayk(i,i)
-#    return sa-.5*sayk
 
 
-#isc={}
-#def istar(alphas): return isc.setdefault(str(alphas),np.where(alphas>0))
-
-C=1
+C=13
 def istar(alphas):
     istr=alphas>0
     istr*=alphas<C
     return np.where(istr==True)
-@autojit
+#@autojit
 def yaKx(yas,kernel,xs,x):#(ys,alphas,kernel,xs,x):
     #ys*=alphas;yas=ys
     for i,ya in enumerate(yas): yas[i]=ya*kernel(xs[i],x)
     yaks=yas #yi*alphai*K(xi,x)
     return np.sum(yaks)
-@autojit
+#@autojit
 def classify(xc,alphas):#(ys,alphas,xs):#alphas from a kernel
     ys=yxs['y']
     xs=yxs['x']
-    istr=range(len(ys))#istar(alphas)
+    istr=istar(alphas)
+    print 'istars=',len(istr)
+    
     yss=ys[istr];alphass=alphas[istr];xss=xs[istr]
     yss*=alphass;
     yass=yss #WOW this vector is made of only 3 numbers: a,0,-a
