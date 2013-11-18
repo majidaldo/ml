@@ -61,8 +61,8 @@ def yKcalc(xs,ys,kernel):
     return yKs
 
 #ugly code due to numba!
-
-yKs=yKcalc(yxs['x'],yxs['y'],Kradial)
+kernel=Kradial
+yKs=yKcalc(yxs['x'],yxs['y'],kernel)
 
 
 ic={}#index cache
@@ -115,11 +115,48 @@ def of(alphas):
 #    return sa-.5*sayk
 
 
+#isc={}
+#def istar(alphas): return isc.setdefault(str(alphas),np.where(alphas>0))
 
-def pyoptof(alphas,*args,**kwrags):
-    alphas=args[0]
-    f=of(alphas,*args[1:])
-    g=np.dot(alphas,args[2])#alphas,ys
+C=1
+def istar(alphas):
+    istr=alphas>0
+    istr*=alphas<C
+    return np.where(istr==True)
+@autojit
+def yaKx(yas,kernel,xs,x):#(ys,alphas,kernel,xs,x):
+    #ys*=alphas;yas=ys
+    for i,ya in enumerate(yas): yas[i]=ya*kernel(xs[i],x)
+    yaks=yas #yi*alphai*K(xi,x)
+    return np.sum(yaks)
+@autojit
+def classify(xc,alphas):#(ys,alphas,xs):#alphas from a kernel
+    ys=yxs['y']
+    xs=yxs['x']
+    istr=range(len(ys))#istar(alphas)
+    yss=ys[istr];alphass=alphas[istr];xss=xs[istr]
+    yss*=alphass;
+    yass=yss #WOW this vector is made of only 3 numbers: a,0,-a
+    b=yaKx(yass,kernel,xss,xss[0])-yss[0] #take first istar
+    #b is an integer!!
+    dec=np.empty_like(ys,dtype=bool)
+    for i,x in enumerate(xc):
+        if (yaKx(yass,kernel,xss,x)-b)>=0: dec[i]=True
+        else: dec[i]=False 
+    return dec
+
+def constrains(alphas):
+    say=np.dot(alphas,yxs['y'])#alphas,ys
+    #cv=np.empty(len(alphas+1))
+    #cv[0]=say #for equality contrain
+    #cv[1:]=alphas #for inequality
+    return np.array([say])#cv
+
+
+def pyoptof(alphas,**kwrags):
+    f=-of(alphas)
+    g=constrains(alphas)
     return f,g,0
     
-    
+
+
