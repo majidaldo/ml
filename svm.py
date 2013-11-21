@@ -67,11 +67,12 @@ def yKcalc(xs,ys,kernel):
            *kernel(xs[lijs[i][0]],xs[lijs[i][1]])
     return yKs
 
+
 #ugly code due to numba!
 
 #choose kernel
-kernel=Kradial
-#kernel=Kpoly
+#kernel=Kradial
+kernel=Kpoly
 yKs=yKcalc(yxs['x'],yxs['y'],kernel)
 
 
@@ -102,14 +103,15 @@ def of(alphas):
 C=100
 def istar(alphas):
     alphas=np.array(alphas)
-    istr=alphas>0
-    istr*=alphas<C
+    istr=(alphas>0)
+    istr*=(alphas<C)
     return np.where(istr==True)[0]
 #@autojit
 def sum_yaKx(yas,kernel,xs,x):#(ys,alphas,kernel,xs,x):
     #ys*=alphas;yas=ys
     #yas=np.empty_like(yas,dtype=mf)
     sm=0.0
+    assert(len(yas)==len(xs))
     for i,ya in enumerate(yas): sm+=ya*kernel(xs[i],x)
     #yaks=yas #yi*alphai*K(xi,x)
     return sm #np.sum(yaks)
@@ -121,18 +123,20 @@ def separate(xc,alphas):#(ys,alphas,xs):#alphas from a kernel
     xs=yxs['x']
     istr=istar(alphas)
     yss=ys[istr]; alphass=alphas[istr]; xss=xs[istr]
-    yass=alphass*yss;
+    #yass=alphass*yss;
     # yass*=alphas WRONG inplace operation got me here bc ys is int!
     bs=[]
+    yass=yss*alphass
     for abi in xrange(len(yss)):
-        b=sum_yaKx(yass,kernel,xss,xss[abi])-yss[abi] #take first istar
+        b=sum_yaKx(yass,kernel,xss,xss[abi])-yss[abi] 
         bs.append(b)
-    b=np.average(bs)
+    b=np.average((bs))
     print bs
     #b=sum_yaKx(yass,kernel,xss,xss[0])-yss[0] #take first istar they 
     #should all be same
     dec=np.empty(len(xc),dtype=bool)
     print 'b=',b
+
     for i,x in enumerate(xc):
         if (sum_yaKx(yass,kernel,xss,x)-b)>=0: dec[i]=True
         else: dec[i]=False 

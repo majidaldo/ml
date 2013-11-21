@@ -22,14 +22,20 @@ def pyoptof(alphas,**kwrags):
 
 
 
-def svmprob():
+def svmprobi():
     optprob=pyOpt.Optimization('test',pyoptof)
     optprob.addObj('of')
     optprob.addVarGroup('a',len(svm.yxs['x']),value=svm.C/2.0
           ,lower=0,upper=svm.C)
     #optprob.addCon('saye0',type='e',equal=0)
-    optprob.addCon('saye0',type='i',lower=-1e-5,upper=1e-5)
+    optprob.addCon('saye0',type='i',lower=-1e-7,upper=1e-7)
     return optprob
+def svmprobe():
+    optprob=svmprobi()
+    optprob.delCon(0)  
+    optprob.addCon('saye0',type='e',equal=0)
+    return optprob
+
 
 
 def testprob():
@@ -38,18 +44,14 @@ def testprob():
     optprob.addObj('of')
     optprob.addVarGroup('a',1,lower=-10,upper=10)
     optprob.addCon('saye0',type='e',equal=0)
-    #opt=pyOpt.pyPSQP.PSQP()
     return optprob
     
 
 
 #fsqp=pyOpt.pyFSQP.FSQP() #optimizer did not compile!
-psqp=pyOpt.pyPSQP.PSQP() #never gives result
-#algencan=pyOpt.pyALGENCAN.ALGENCAN()
+psqp=pyOpt.pyPSQP.PSQP() #the most appropriate but..obj func blows up
+#algencan=pyOpt.pyALGENCAN.ALGENCAN() #did not compile!
 slsqp=pyOpt.pySLSQP.SLSQP() #fast but have to retry
-slsqp.setOption('MAXIT', 1000)
-slsqp.setOption('IPRINT',0)
-slsqp.setOption('ACC',1e-3)
 nsga=pyOpt.pyNSGA2.pyNSGA2.NSGA2()#equality constraint not supported
 coblya=pyOpt.pyCOBYLA.pyCOBYLA.COBYLA()#equality not supported
 sdpen=pyOpt.pySDPEN.SDPEN() #cannot handle equality
@@ -58,4 +60,5 @@ sdpen=pyOpt.pySDPEN.SDPEN() #cannot handle equality
 #change inputs in svm.py
 #reload(svm)
 #optimize: slsqp(svmprob())
-#classify: svm.classify(svm.classi)
+#classify: svm.separate(svm.classi)
+#
