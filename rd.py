@@ -25,6 +25,10 @@ def getdata(dataset):
 
 
 
+def getlen(data):
+    n=0
+    for i in data: n+=1
+    return n
 
 #just a personal note
 #maybe input data in numpy record array
