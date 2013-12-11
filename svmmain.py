@@ -4,6 +4,24 @@ import numpy as np
 import pyOpt
 
 
+#fsqp=pyOpt.pyFSQP.FSQP() #optimizer did not compile!
+#psqp=pyOpt.pyPSQP.PSQP() #the most appropriate but..obj func blows up
+#algencan=pyOpt.pyALGENCAN.ALGENCAN() #did not compile!
+#slsqp=pyOpt.pySLSQP.SLSQP() #fast but have to retry
+nsga=pyOpt.pyNSGA2.pyNSGA2.NSGA2()#equality constraint not supported
+#nsga.setOption('PrintOut',0) #LOCKS UP MY COMPUTER!
+
+#coblya=pyOpt.pyCOBYLA.pyCOBYLA.COBYLA()#equality not supported
+#sdpen=pyOpt.pySDPEN.SDPEN() #cannot handle equality
+
+#change inputs in svm.py
+#svm.init(class1,class2) #includes !class
+#optimize: slsqp(svmprob())
+#classify: svm.separate(svm.classi)
+
+
+
+
 # def testprob():
 #     def ft(x): return (3+x[0]**2,np.array([0]),0)
 #     optprob=pyOpt.Optimization('test',ft)
@@ -56,26 +74,21 @@ def fnhash(class1,class2): return str(abs(hash((class1,class2))))+'.a'
 #dv=client[:]
 #dv.map_sync(trainnots,  ['1','2','4','5','7','9'])
 
-def trainnots(digits):
-    o=[]
-    for ad in digits:
-        nd='!'+ad
-        svm.init(ad,nd)
-        nsga=pyOpt.pyNSGA2.pyNSGA2.NSGA2()
-        nsga.setOption('PrintOut',0)
-        opto=nsga(svmprobi())
-        saveopt(ad,nd,opto[1])
-        o.append(opto)
-    return o
-    
-def loadopt(class1,class2): return np.loadtxt(fnhash(class1,class2),dtype=svm.mf)
-
-def train(class1,class2):
-    svm.init(class1,class2)
+def trainnot(digit):
+    nd='!'+digit
+    svm.init(adigit,nd)
     nsga=pyOpt.pyNSGA2.pyNSGA2.NSGA2()
     nsga.setOption('PrintOut',0)
     opto=nsga(svmprobi())
-    saveopt(ad,nd,opto[1])
+    saveopt(adigit,nd,opto[1])
+    return opto
+    
+def loadopt(class1,class2): return np.loadtxt(fnhash(class1,class2),dtype=svm.mf)
+
+def train(class1,class2,opt=nsga):
+    svm.init(class1,class2)
+    opto=nsga(svmprobi())
+    saveopt(class1,class2,opto[1])
     return opto
 
 
@@ -91,7 +104,8 @@ def classify10(xc):
 def evalclassify10(ys,xc):
     correct=(ys==xc)
     return float(sum(correct))/len(correct)
-    
+
+def final(): return evalclassify(test['y'],classify(test['x']))
 
 def classify210():
     br=[]
@@ -100,18 +114,4 @@ def classify210():
         sp=svm.evalsep(svm.yxstest,loadopt(ad,'!'+ad))
         br.append(sum(sp)/float(len(sp)))
     return br
-
-#fsqp=pyOpt.pyFSQP.FSQP() #optimizer did not compile!
-#psqp=pyOpt.pyPSQP.PSQP() #the most appropriate but..obj func blows up
-#algencan=pyOpt.pyALGENCAN.ALGENCAN() #did not compile!
-#slsqp=pyOpt.pySLSQP.SLSQP() #fast but have to retry
-nsga=pyOpt.pyNSGA2.pyNSGA2.NSGA2()#equality constraint not supported
-#coblya=pyOpt.pyCOBYLA.pyCOBYLA.COBYLA()#equality not supported
-#sdpen=pyOpt.pySDPEN.SDPEN() #cannot handle equality
-
-
-#change inputs in svm.py
-#svm.init(class1,class2) #includes !class
-#optimize: slsqp(svmprob())
-#classify: svm.separate(svm.classi)
 

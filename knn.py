@@ -47,7 +47,8 @@ def classify(k,dists,wfunc,*wfuncargs):
        # votes=voting(k)
         if len(set(votes.values()))!=len(votes.values()):#ties possible
             #raise ValueError("tie",votes)
-            winc='t'#t for tie
+            winc=choice(votes.keys())
+            #winc='t'#t for tie
         else: winc=votes.keys()[np.argmax(votes.values())]
         yield tc,winc#,votes#test classification,winner
 
@@ -76,7 +77,8 @@ def tally(classit):
 
 def main(distfunc,k,wfunc,*wfargs):
     ds=(distances(pairs(rd.test,rd.train),distfunc))
-    cs=classify(k,distances(pairs(rd.test,rd.train),distfunc),wfunc,*wfargs)
+    cs=classify(k,distances(pairs(rd.test,dict([(ak,rd.train[ak]) for ak in rd.digits]) ),distfunc)
+                ,wfunc,*wfargs)
     return tally(cs)
 
 from itertools import product
@@ -89,3 +91,6 @@ def hw():
     for ak,awf in cases:
         t=main(d2n,ak,awf,1)
         print wn[hash(awf)],'\t', ak,'\t',str(float(t[0])/t[1])[:4]
+
+
+if __name__=='__main__':hw()
